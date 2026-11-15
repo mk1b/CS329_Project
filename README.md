@@ -15,6 +15,6 @@ overall notes and trends: alpha means how much the policy explores. more alpha m
 More episodes mean more convergence. if q is better than Dp, then evaluation is too shallow. increase number of episodes in evaluation till DP is better than Q.
 All these confirm that model is working correctly. Now, need to isolate the effect of each hyperparameter.
 
-Task 1: Ask AI to generate a set of experiments that isolate the effect of each hyperparameter. See report for reference on which hyperparameter. Compare across defence cost and reward.
-Task 2: Make Attacker in RL and rerun the above experiments to see the difference. (rn only defender is RL and attacker is strategic)
-Task 3: Make interactive visualization. The user should be able to play somehow(maybe through input commands or something).
+Task 1: Ask AI to generate a set of experiments that isolate the effect of each hyperparameter. See report for reference on which hyperparameter. Compare across defence cost and reward.  [DONE]
+Task 2: Make Attacker in RL and rerun the above experiments to see the difference. (rn only defender is RL and attacker is strategic)  [DONE]
+Task 3: Make interactive visualization. The user should be able to play somehow(maybe through input commands or something).[NOT NEEDED]
