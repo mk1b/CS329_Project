@@ -11,27 +11,21 @@ The mathematical formulation, experimental protocol, plots, and discussion are i
 
 ## Game model
 
-There are \(K\) targets. Target \(i\) has value \(V_i\), baseline attack-success probability \(p_i\), attack cost \(c_i\), and per-turn recovery probability \(\rho_i\). The defender has an integer budget \(B\), defense effectiveness \(\eta\), unit defense cost \(\lambda\), and discount factor \(\gamma\).
+There are $K$ targets. Target $i$ has value $V_i$, baseline attack-success probability $p_i$, attack cost $c_i$, and per-turn recovery probability $\rho_i$. The defender has an integer budget $B$, defense effectiveness $\eta$, unit defense cost $\lambda$, and discount factor $\gamma$.
 
-The infection state is \(x\in\{0,1\}^K\), where \(x_i=1\) denotes an infected target. The defender chooses an allocation \(d\) satisfying
+The infection state is $x\in\{0,1\}^K$, where $x_i=1$ denotes an infected target. The defender chooses an allocation $d$ satisfying
 
-\[
- d_i\in\mathbb{Z}_{\geq 0},\qquad \sum_{i=1}^{K}d_i\leq B.
-\]
+$$d_i\in\mathbb{Z}_{\geq 0},\qquad \sum_{i=1}^{K}d_i\leq B.$$
 
-The probability that an attack on target \(i\) succeeds is
+The probability that an attack on target $i$ succeeds is
 
-\[
- q_i(d_i)=p_i(1-\eta)^{d_i}.
-\]
+$$q_i(d_i)=p_i(1-\eta)^{d_i}.$$
 
 Each turn proceeds in the following order: the defender observes the current infection state and allocates defense; the attacker observes both the state and allocation and selects one target; the attack is sampled; then targets infected at the start of the turn may recover. A target infected during the current turn cannot recover in that same turn.
 
 The defender's reward is the negative weighted infection loss and defense expenditure,
 
-\[
- r_D(x,d)=-\sum_i V_i x_i-\lambda\sum_i d_i.
-\]
+$$r_D(x,d)=-\sum_i V_i x_i-\lambda\sum_i d_i.$$
 
 The attacker receives the target's value only when it causes a new infection, minus the attack cost. These rewards are not zero-sum.
 
@@ -41,8 +35,8 @@ The attacker receives the target's value only when it causes a new infection, mi
 |---|---|---|
 | Learning agents | Defender only | Defender and attacker |
 | Attacker | Greedy myopic best response to the current allocation | Tabular Q-learner observing state and allocation |
-| Defender Q-table | \(Q_D(x,d)\) | \(Q_D(x,d)\) |
-| Attacker Q-table | — | \(Q_A(x,d,a)\) |
+| Defender Q-table | $Q_D(x,d)$ | $Q_D(x,d)$ |
+| Attacker Q-table | — | $Q_A(x,d,a)$ |
 | Benchmark | Exact value iteration for the fixed-attacker MDP | No equilibrium benchmark; optional best-response DP is available in code |
 | Training environment | Stationary for the defender | Non-stationary while both agents learn |
 
@@ -50,18 +44,18 @@ Both learners use epsilon-greedy action selection and tabular Q-learning. In `dy
 
 ## Experimental findings
 
-The report's main testbed uses \(K=5\), \(B=2\), \(\eta=0.20\), \(\lambda=0.75\), and \(\gamma=0.95\), with four training seeds. Each episode contains 100 turns.
+The report's main testbed uses $K=5$, $B=2$, $\eta=0.20$, $\lambda=0.75$, and $\gamma=0.95$, with four training seeds. Each episode contains 100 turns.
 
 ### Static: learning against a fixed attacker
 
-At \(\eta=0.20\), Q-learning improves with longer training and outperforms the fixed highest-value allocation, while remaining below the exact DP benchmark.
+At $\eta=0.20$, Q-learning improves with longer training and outperforms the fixed highest-value allocation, while remaining below the exact DP benchmark.
 
 | Training episodes | DP return | Q-learning return | Highest-value return |
 |---:|---:|---:|---:|
-| 10,000 | \(-262.81\pm1.36\) | \(-294.89\pm7.66\) | \(-299.83\pm1.18\) |
-| 50,000 | \(-262.81\pm1.36\) | \(-288.96\pm11.06\) | \(-299.83\pm1.18\) |
+| 10,000 | $-262.81\pm1.36$ | $-294.89\pm7.66$ | $-299.83\pm1.18$ |
+| 50,000 | $-262.81\pm1.36$ | $-288.96\pm11.06$ | $-299.83\pm1.18$ |
 
-*Mean finite-horizon discounted defender return ± standard deviation across four seeds. The exact infinite-horizon DP value at the all-healthy state is \(-265.19\). The 500-episode reference run uses \(\eta=0.10\), so it is not directly comparable to these rows.*
+*Mean finite-horizon discounted defender return ± standard deviation across four seeds. The exact infinite-horizon DP value at the all-healthy state is $-265.19$. The 500-episode reference run uses $\eta=0.10$, so it is not directly comparable to these rows.*
 
 ![Static policy comparison](project_report_and_figures/report_figures/01_static_policy_comparison.png)
 
@@ -71,15 +65,15 @@ Against the same seed's frozen learned attacker, the learned defender achieves a
 
 | Training episodes | Learned defender return | Highest-value return |
 |---:|---:|---:|
-| 500 | \(-230.57\pm16.32\) | \(-260.67\pm25.67\) |
-| 10,000 | \(-271.48\pm11.04\) | \(-281.24\pm10.06\) |
-| 50,000 | \(-273.75\pm24.44\) | \(-287.11\pm7.54\) |
+| 500 | $-230.57\pm16.32$ | $-260.67\pm25.67$ |
+| 10,000 | $-271.48\pm11.04$ | $-281.24\pm10.06$ |
+| 50,000 | $-273.75\pm24.44$ | $-287.11\pm7.54$ |
 
 *Mean discounted defender return ± standard deviation across four seeds. The 500-episode attacker is weaker on average than the longer-trained attackers, so these rows compare different stages of joint adaptation rather than isolating the effect of training duration.*
 
 ![Dynamic policy comparison](project_report_and_figures/report_figures/09_dynamic_policy_returns.png)
 
-Cross-play tests show that performance depends on the opponent: for example, the 10,000-episode dynamic-trained defender's return changes from \(-271.48\) against its paired learned attacker to \(-290.12\) against the greedy attacker. The learned policies should therefore not be interpreted as robust against arbitrary attack strategies.
+Cross-play tests show that performance depends on the opponent: for example, the 10,000-episode dynamic-trained defender's return changes from $-271.48$ against its paired learned attacker to $-290.12$ against the greedy attacker. The learned policies should therefore not be interpreted as robust against arbitrary attack strategies.
 
 ![Cross-play results](project_report_and_figures/report_figures/13_crossplay_defender_returns.png)
 
@@ -153,7 +147,7 @@ Edit `config.py` in the relevant architecture to change the number of targets (`
 
 **The source defaults are not the report defaults.** The current `static/config.py` and `dynamic/config.py` start with `K=10`, `B=5`, 500 training episodes, and five seeds. The report's principal experiments instead use `K=5`, `B=2`, four seeds (`42`, `169`, `6969`, `696969`), and training lengths of 500, 10,000, or 50,000 episodes. Some static runs also use different defense-effectiveness and evaluation settings. The archived `config.json` files under each `expts/` run directory record the settings used for those saved experiments.
 
-The state space has \(2^K\) states and the number of legal defense allocations is \(\binom{K+B}{B}\). Consequently, the tabular action spaces grow quickly as `K` and `B` increase, especially for the attacker table in `dynamic`.
+The state space has $2^K$ states and the number of legal defense allocations is $\binom{K+B}{B}$. Consequently, the tabular action spaces grow quickly as `K` and `B` increase, especially for the attacker table in `dynamic`.
 
 ## Outputs
 
