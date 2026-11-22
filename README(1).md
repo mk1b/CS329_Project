@@ -1,176 +1,144 @@
 # Adaptive Defense in a Repeated Attacker–Defender Security Game
 
-A tabular reinforcement-learning study of how to allocate a limited defense budget across vulnerable targets when an attacker may be either **fixed and greedy** or **adaptive**.
+Code, raw results, and reproduction scripts for the FAI final report
+*"Adaptive Defense in a Repeated Attacker–Defender Security Game"*.
 
-The project compares two increasingly interactive settings:
+A defender splits a budget of `B` units across `K` targets each turn; an attacker picks one target.
+Targets get infected (and later recover). We study two settings:
 
-- **Static attacker:** a Q-learning defender faces a deterministic, myopic attacker. Fixing the attacker makes the defender's problem a stationary Markov decision process (MDP), which can be solved exactly with dynamic programming (DP).
-- **Adaptive attacker:** the defender and attacker are independent tabular Q-learners. The attacker observes the defender's allocation before selecting a target, so both policies adapt to one another in a general-sum stochastic game.
+| Folder | Attacker | Defender | Reference |
+|---|---|---|---|
+| `static/` | fixed greedy myopic best response | tabular Q-learning | exact value iteration (DP) |
+| `dynamic/` | independent tabular Q-learner that sees the defender's allocation | tabular Q-learning | none (general-sum game, no equilibrium computed) |
+| `cross_play/` | swaps opponents: dynamic-trained defender vs greedy attacker, static-trained defender vs frozen dynamic attacker | – | – |
 
-The mathematical formulation, experimental protocol, plots, and discussion are in the [project report](project_report_and_figures/revised_mathematical_formulation_with_experiments_and_discussion.md).
+Each of `static/expts`, `dynamic/expts`, `cross_play/` already contains the raw per-seed and summary CSVs behind every table in the report.
 
-## Game model
+## 1. Setup
 
-There are $K$ targets. Target $i$ has value $V_i$, baseline attack-success probability $p_i$, attack cost $c_i$, and per-turn recovery probability $\rho_i$. The defender has an integer budget $B$, defense effectiveness $\eta$, unit defense cost $\lambda$, and discount factor $\gamma$.
-
-The infection state is $x\in\{0,1\}^K$, where $x_i=1$ denotes an infected target. The defender chooses an allocation $d$ satisfying
-
-$$d_i\in\mathbb{Z}_{\geq 0},\qquad \sum_{i=1}^{K}d_i\leq B.$$
-
-The probability that an attack on target $i$ succeeds is
-
-$$q_i(d_i)=p_i(1-\eta)^{d_i}.$$
-
-Each turn proceeds in the following order: the defender observes the current infection state and allocates defense; the attacker observes both the state and allocation and selects one target; the attack is sampled; then targets infected at the start of the turn may recover. A target infected during the current turn cannot recover in that same turn.
-
-The defender's reward is the negative weighted infection loss and defense expenditure,
-
-$$r_D(x,d)=-\sum_i V_i x_i-\lambda\sum_i d_i.$$
-
-The attacker receives the target's value only when it causes a new infection, minus the attack cost. These rewards are not zero-sum.
-
-## Learning architectures
-
-| | `static` | `dynamic` |
-|---|---|---|
-| Learning agents | Defender only | Defender and attacker |
-| Attacker | Greedy myopic best response to the current allocation | Tabular Q-learner observing state and allocation |
-| Defender Q-table | $Q_D(x,d)$ | $Q_D(x,d)$ |
-| Attacker Q-table | — | $Q_A(x,d,a)$ |
-| Benchmark | Exact value iteration for the fixed-attacker MDP | No equilibrium benchmark; optional best-response DP is available in code |
-| Training environment | Stationary for the defender | Non-stationary while both agents learn |
-
-Both learners use epsilon-greedy action selection and tabular Q-learning. In `dynamic`, the attacker bootstraps over the defender's next allocation before maximizing over its own next target. Since both policies change during joint training, the usual single-agent Q-learning convergence guarantees do not apply to that process. The project does not claim to compute a Nash or Stackelberg equilibrium.
-
-## Experimental findings
-
-The report's main testbed uses $K=5$, $B=2$, $\eta=0.20$, $\lambda=0.75$, and $\gamma=0.95$, with four training seeds. Each episode contains 100 turns.
-
-### Static: learning against a fixed attacker
-
-At $\eta=0.20$, Q-learning improves with longer training and outperforms the fixed highest-value allocation, while remaining below the exact DP benchmark.
-
-| Training episodes | DP return | Q-learning return | Highest-value return |
-|---:|---:|---:|---:|
-| 10,000 | $-262.81\pm1.36$ | $-294.89\pm7.66$ | $-299.83\pm1.18$ |
-| 50,000 | $-262.81\pm1.36$ | $-288.96\pm11.06$ | $-299.83\pm1.18$ |
-
-*Mean finite-horizon discounted defender return ± standard deviation across four seeds. The exact infinite-horizon DP value at the all-healthy state is $-265.19$. The 500-episode reference run uses $\eta=0.10$, so it is not directly comparable to these rows.*
-
-![Static policy comparison](project_report_and_figures/report_figures/01_static_policy_comparison.png)
-
-### Dynamic: joint learning
-
-Against the same seed's frozen learned attacker, the learned defender achieves a higher discounted return than the fixed highest-value baseline at every reported training length. It also reduces cumulative infection loss and defense expenditure in each comparison.
-
-| Training episodes | Learned defender return | Highest-value return |
-|---:|---:|---:|
-| 500 | $-230.57\pm16.32$ | $-260.67\pm25.67$ |
-| 10,000 | $-271.48\pm11.04$ | $-281.24\pm10.06$ |
-| 50,000 | $-273.75\pm24.44$ | $-287.11\pm7.54$ |
-
-*Mean discounted defender return ± standard deviation across four seeds. The 500-episode attacker is weaker on average than the longer-trained attackers, so these rows compare different stages of joint adaptation rather than isolating the effect of training duration.*
-
-![Dynamic policy comparison](project_report_and_figures/report_figures/09_dynamic_policy_returns.png)
-
-Cross-play tests show that performance depends on the opponent: for example, the 10,000-episode dynamic-trained defender's return changes from $-271.48$ against its paired learned attacker to $-290.12$ against the greedy attacker. The learned policies should therefore not be interpreted as robust against arbitrary attack strategies.
-
-![Cross-play results](project_report_and_figures/report_figures/13_crossplay_defender_returns.png)
-
-## Repository layout
-
-```text
-.
-├── README.md
-├── proj/
-│   ├── static/
-│   │   ├── config.py       # Game, training, evaluation, and sweep settings
-│   │   ├── game.py         # Environment and fixed greedy attacker
-│   │   ├── algorithms.py   # Value iteration and defender Q-learning
-│   │   ├── main.py         # Experiments, evaluation, plots, and CSVs
-│   │   └── expts/          # Archived static experiment outputs
-│   ├── dynamic/
-│   │   ├── config.py       # Game and two-agent training settings
-│   │   ├── game.py         # Environment with explicit attacker actions
-│   │   ├── algorithms.py   # Independent defender/attacker Q-learning
-│   │   ├── main.py         # Joint experiments, evaluation, plots, and CSVs
-│   │   ├── README.md
-│   │   └── expts/          # Archived dynamic experiment outputs
-│   └── cross_play/
-│       ├── evaluate_greedy.py
-│       ├── evaluate_static_defender_vs_rl_attacker.py
-│       └── ...             # Saved cross-play result tables
-└── project_report_and_figures/
-    ├── revised_mathematical_formulation_with_experiments_and_discussion.md
-    └── report_figures/     # Figures used in the report
-```
-
-## Setup
-
-**Requirements:** Python 3.10 or newer and NumPy. Matplotlib is optional; it is used to generate plots, while the simulations and CSV outputs can run without it.
+Python 3.10+ (the code uses `X | None` type syntax).
 
 ```bash
-python -m venv .venv
-# Activate the environment, then:
-python -m pip install numpy matplotlib
+pip install -r requirements.txt     # numpy (required); pandas (verify script); matplotlib (optional plots)
 ```
 
-There is no repository-level `requirements.txt`; the dependencies above are the direct runtime dependencies used by the experiment code.
-
-## Run the experiments
-
-Run each architecture from its own directory so its local `config.py`, `game.py`, and `algorithms.py` are imported.
-
-**Static attacker / single-agent defender**
+## 2. Quickest check: recompute the report tables from the shipped CSVs (seconds)
 
 ```bash
-cd proj/static
-python main.py
+python verify_csvs.py .
 ```
 
-This computes the exact DP solution, trains the defender for the configured seeds, evaluates DP/Q-learning/heuristic policies, and writes result tables, checkpoints, and plots under `proj/static/outputs/`.
+Prints mean ± sample SD (across the 4 training seeds) for every static, dynamic and cross-play run,
+to compare with the report tables.
 
-**Dynamic attacker / two-agent learning**
+## 3. Smoke test (about a minute)
 
 ```bash
-cd proj/dynamic
-python main.py
+cd static  && python run_report.py --episodes 500 --eval-episodes 50 --seeds 42 --out runs/smoke --no-plots
+cd ../dynamic && python run_report.py --episodes 500 --eval-episodes 50 --seeds 42 --out runs/smoke --no-plots
 ```
 
-This trains both agents, evaluates the learned defender against its paired frozen attacker and fixed-allocation baselines, and writes outputs under `proj/dynamic/outputs/`. An exact defender best-response calculation against the frozen learned attacker can be enabled with `run_best_response_dp=True` in `proj/dynamic/config.py`; this is a best response, not an equilibrium computation.
+If both finish and print a results table, the environment works.
 
-To enable the parameter sweeps defined in a configuration file, set `RUN_PARAMETER_SWEEPS = True` in that architecture's `config.py` and adjust `PARAMETER_SWEEP` as needed.
+## 4. Reproducing the report experiments
 
-## Configuration and reproducibility
+> Use the `run_report.py` wrappers below,
+> which apply the report configuration (`K=5, B=2, η=0.20, λ=0.75, γ=0.95, α=0.10`, 100-step episodes,
+> seeds `42 169 6969 696969`, ε decays 1.0→0.05 over 20% of training steps = 10k / 200k / 1M steps for
+> 500 / 10k / 50k episodes) without editing any file. Each experiment's exact settings are also saved
+> as `config.json` in `static/expts/*` and `dynamic/expts/*`.
 
-Edit `config.py` in the relevant architecture to change the number of targets (`K`), budget (`B`), target values, attack and recovery probabilities, learning rates, exploration schedules, episode lengths, evaluation settings, and random seeds. The per-target arrays (`values`, `attack_probs`, `attack_costs`, and `recovery_probs`) must each contain exactly `K` entries.
+All commands run from inside the named folder. Outputs go to `--out` (`results/*.csv`, `checkpoints/*.npz`, `figures/`).
 
-**The source defaults are not the report defaults.** The current `static/config.py` and `dynamic/config.py` start with `K=10`, `B=5`, 500 training episodes, and five seeds. The report's principal experiments instead use `K=5`, `B=2`, four seeds (`42`, `169`, `6969`, `696969`), and training lengths of 500, 10,000, or 50,000 episodes. Some static runs also use different defense-effectiveness and evaluation settings. The archived `config.json` files under each `expts/` run directory record the settings used for those saved experiments.
-
-The state space has $2^K$ states and the number of legal defense allocations is $\binom{K+B}{B}$. Consequently, the tabular action spaces grow quickly as `K` and `B` increase, especially for the attacker table in `dynamic`.
-
-## Outputs
-
-Each fresh run writes:
-
-- `outputs/config.json` — exact configuration used for the run.
-- `outputs/results/` — per-seed and aggregate CSV summaries.
-- `outputs/checkpoints/` — saved Q-tables; `static` also saves the DP solution.
-- `outputs/figures/` — learning curves and policy-comparison plots (when Matplotlib is installed).
-
-The repository also includes archived sweeps and plots under `proj/static/expts/` and `proj/dynamic/expts/`, plus cross-play CSVs under `proj/cross_play/`.
-
-### Cross-play helper
-
-The `evaluate_greedy.py` helper evaluates a trained dynamic defender against the original greedy attacker. After training the dynamic agents, run it from the dynamic directory:
+### 4.1 Static (fixed greedy attacker)
 
 ```bash
-cd proj/dynamic
-python ../cross_play/evaluate_greedy.py
+cd static
+python run_report.py --episodes 500   --eta 0.1 --out runs/500ep_eta0.1   # Table 1, 500-episode row (η=0.1)
+python run_report.py --episodes 500            --out runs/500ep_eta0.2   # needed for cross-play
+python run_report.py --episodes 10000          --out runs/10000ep
+python run_report.py --episodes 50000          --out runs/50000ep
 ```
 
-The `evaluate_static_defender_vs_rl_attacker.py` helper is also included. Its current implementation hard-codes checkpoint paths (the command-line options shown in its docstring are not implemented) and contains a duplicated script entry point; adjust these before running it with separate static and dynamic checkpoint directories. Archived cross-play results are included in the repository.
+Static evaluation uses 1,000 rollouts per seed (default). One-factor sweeps (add to the 10k/50k commands):
 
-## Scope and limitations
+| Sweep | Flags |
+|---|---|
+| Budget B ∈ {3, 5} (10k) | `--B 3` / `--B 5` |
+| η ∈ {0.05, 0.40} (10k, 50k) | `--eta 0.05` / `--eta 0.4` |
+| α_D ∈ {0.05, 0.20, 0.40} (10k) | `--alpha 0.05` etc. |
+| Short decay (10k) | `--decay-steps 20000` |
+| λ ∈ {0.25, 1.50} (50k) | `--lam 0.25` / `--lam 1.5` |
 
-The experiments are tabular and use four training seeds, a 100-turn evaluation horizon, and an all-healthy initial state. The state/action spaces become expensive as the number of targets or defense budget grows. In the dynamic setting, simultaneous adaptation makes the environment non-stationary during training; no equilibrium is computed, and cross-play covers only a small set of opponent swaps. Results should be read as empirical findings for the tested configurations, not general guarantees about optimal or robust defense.
+### 4.2 Dynamic (two learning agents)
+
+```bash
+cd dynamic
+python run_report.py --episodes 500   --out runs/500ep
+python run_report.py --episodes 10000 --out runs/10000ep
+python run_report.py --episodes 50000 --out runs/50000ep
+```
+
+Baselines use 10,000 evaluation rollouts per seed (default). Report sweeps mostly use 1,000: add `--eval-episodes 1000`.
+Sweeps change one learner at a time:
+
+| Sweep | Flags |
+|---|---|
+| Defender learning rate 0.05 / 0.20 / 0.40 | `--alpha 0.05` … |
+| Attacker learning rate 0.05 / 0.20 / 0.40 | `--attacker-alpha 0.05` … |
+| Defender ε-decay 0.1× / 2× / 4× | 10k eps: `--decay-steps 20000 / 400000 / 800000`; 50k eps: `100000 / 2000000 / 4000000` |
+| Attacker ε-decay 0.1× / 2× / 4× | same values via `--attacker-decay-steps` |
+
+### 4.3 Cross-play
+
+Cross-play needs checkpoints from one static run (**η = 0.20**) and one dynamic run of the same length, then:
+
+```bash
+cd cross_play
+python run_crossplay.py --static-ckpt ../static/runs/500ep_eta0.2/checkpoints \
+                        --dynamic-ckpt ../dynamic/runs/500ep/checkpoints --out results_500ep
+```
+
+Writes the same four CSVs (by-seed + summary, both directions) as the shipped `cross_play/*/500ep` folders.
+Use `10000ep` / `50000ep` runs for the other rows. Policies are paired by training seed; evaluation seeds are
+`seed+100000` (dynamic defender vs greedy) and `seed+200000` (static defender vs dynamic attacker).
+
+### 4.4 Determinism
+
+Runs are seeded, so a given command reproduces the same numbers on the same NumPy version.
+Different NumPy versions may change random streams slightly; expect agreement within seed-to-seed noise.
+
+Runtime scales with episodes × seeds × evaluation rollouts. A 500-episode run takes minutes; the 10k and especially 50k-episode
+runs (and their 10,000-rollout evaluations) are much longer(~20 mins). Use `--seeds 42` and `--eval-episodes` to cut 2-3 minutes when checking.
+
+## 5. Headline results (mean ± SD over 4 seeds; discounted defender return, higher is better)
+
+| | Episodes | Learned | Highest-value | DP |
+|---|---|---|---|---|
+| static | 10,000 | −294.89 ± 7.66 | −299.83 ± 1.18 | −262.81 ± 1.36 |
+| static | 50,000 | −288.96 ± 11.06 | −299.83 ± 1.18 | −262.81 ± 1.36 |
+| dynamic | 10,000 | −271.48 ± 11.04 | −281.24 ± 10.06 | – |
+| dynamic | 50,000 | −273.75 ± 24.44 | −287.11 ± 7.54 | – |
+
+With only four seeds, paired per-seed differences between learned and highest-value policies are **not**
+statistically significant (paired t-test p ≈ 0.07–0.38); The learned defender also
+does not beat highest-value in every static sweep setting (e.g. η = 0.40, α ≥ 0.20).
+
+## 6. Note for checkers
+
+* `static/` and `dynamic/` each define modules named `config`, `game`, `algorithms`, `main`. Run scripts from inside their own folder
+  (as above); `cross_play/run_crossplay.py` imports from `../dynamic` automatically.
+
+## 7. Repository layout
+
+```
+requirements.txt
+verify_csvs.py              # recompute report tables from shipped CSVs
+static/      config.py game.py algorithms.py main.py run_report.py   expts/<epochs>/<setting>/
+dynamic/     config.py game.py algorithms.py main.py run_report.py README.md  expts/<epochs>/<setting>/
+cross_play/  run_crossplay.py evaluate_greedy.py evaluate_static_defender_vs_rl_attacker.py  <direction>/<epochs>/*.csv
+```
+
+## Authors
+
+Bhaumik Malaviya, Laxmidhar Panda, Bhakti Prasad Swain, and Mateen Sharief.
